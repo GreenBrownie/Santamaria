@@ -41,6 +41,6 @@ for df in dataframes:
 mega_df= pd.concat(dataframes_limpios)
 
 #Guardar el dataframe en un csv para testear
-mega_df.to_csv(os.path.join(directorio, 'df.csv'), encoding='windows-1252', index=False)
+mega_df.to_csv(os.path.join(directorio, 'df.csv'), encoding='windows-1252', index=False, mode='w')
 
         
