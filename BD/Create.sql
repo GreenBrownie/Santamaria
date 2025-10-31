@@ -5,7 +5,7 @@ USE partidosBD;
 CREATE TABLE PartidosML (
     id_partido INT PRIMARY KEY AUTO_INCREMENT,
 
-    fecha VARCHAR(50),
+    fecha DATE,
     hora TIME,
     
     equipo_local VARCHAR(50),
@@ -14,7 +14,7 @@ CREATE TABLE PartidosML (
     id_equipo_visitante INT, -- Tienen que coinicidir con EquiposRef ¿Realmente mejorará el performance? No estoy sobresimplificando?
     
     goles_local_final INT,
-    goles_visitante_final INT,partidosbd
+    goles_visitante_final INT,
     resultado_final VARCHAR(1), -- H/D/A futura predicción en % 
     goles_local_ht INT,
     goles_visitante_ht INT, 
@@ -23,7 +23,7 @@ CREATE TABLE PartidosML (
     disparos_visitante INT,
     disparos_porteria_local INT,
     disparos_porteria_visitante INT,
-    corners_local INT,
+    corners_local INT,partidosbd
     corners_visitante INT,
     faltas_local INT,
     faltas_visitante INT,

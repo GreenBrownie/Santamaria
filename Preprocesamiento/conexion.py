@@ -1,14 +1,13 @@
 import pandas as pd
 from sqlalchemy import create_engine
 from typing import Optional
-from .config import CONFIG_BD, COLUMNAS_USAR
+from config import CONFIG_BD, COLUMNAS_USAR
 
 class CargadorDatos:
     def __init__(self, config_bd: dict = None):
         self.config_bd = config_bd or CONFIG_BD
         self.engine = None
 
-    def conectar(self) -> bool:
         #Crea el engine de SQLAlchemy
         user = self.config_bd['user']
         pwd = self.config_bd['password']
@@ -19,18 +18,17 @@ class CargadorDatos:
         self.engine = create_engine(url, echo=False)
         #Prueba sencilla de conexión
         with self.engine.connect() as conn:
-            return True
+            #ta bien
+            pass
 
 
     def desconectar(self):
         if self.engine:
             self.engine.dispose()
-            self.engine = NonSe
+            self.engine = None
 
     def cargar(self, consulta: Optional[str] = None, limite: Optional[int] = None) -> pd.DataFrame:
         #Ejecuta la consulta y devuelve un DataFrame Si no se especifica consulta, selecciona COLUMNAS_USAR
-        self.conectar()
-
         if consulta is None:
             cols = ', '.join(COLUMNAS_USAR)
             consulta = f"SELECT {cols} FROM partidosml"

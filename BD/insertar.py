@@ -14,8 +14,17 @@ ruta_archivo = os.path.join(directorio, 'df.csv')
 
 #Carga de csv
 df = pd.read_csv(ruta_archivo, encoding='windows-1252', on_bad_lines='skip')
-
 engine = create_engine('mysql+mysqlconnector://root:5514@localhost/partidosBD')
+
+#Strptime
+#df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%y', errors='coerce').dt.date
+
+#Primer intentoformato con año de 2 dígitos
+df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%y', errors='coerce')
+
+df['Date'] = df['Date'].apply(lambda x: x.isoformat() if x is not None else None)
+#dftest = df['Date']
+#print(dftest)
 
 #Insertar los equipos
 equipos = pd.unique(df[['HomeTeam', 'AwayTeam']].values.ravel())
@@ -39,6 +48,10 @@ df['id_equipo_visitante'] = df['AwayTeam'].map(nombre_to_id)
 #reemplazar NaN por None
 df = df.astype(str).replace({'nan': None, 'None': None})
 df = df.where(pd.notnull(df), None)
+
+# Reemplazar NaT o NaN por None antes de insertar
+df['Date'] = df['Date'].replace({pd.NaT: None, 'NaT': None, np.nan: None})
+df['Time'] = df['Time'].replace({pd.NaT: None, 'NaT': None, np.nan: None})
 
 #Insertar los datos en la tablisima
 with engine.begin() as conn:

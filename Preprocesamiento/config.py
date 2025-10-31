@@ -9,11 +9,10 @@ CONFIG_BD = {
 
 #Columnas
 COLUMNAS_USAR = [
-    'id_partido',
     'fecha',
-    'hora',
     'id_equipo_local','id_equipo_visitante',
-    'goles_local_final','goles_visitante_final',
+    'goles_local_final',
+    'goles_visitante_final',
     'resultado_final',
     'goles_local_ht','goles_visitante_ht',
     'resultado_ht',
@@ -27,10 +26,10 @@ COLUMNAS_USAR = [
 
 # Columnas numéricas
 COLUMNAS_NUMERICAS = [
-    'id_equipo_local',
-    'id_equipo_visitante',
-    'goles_local_final',
-    'goles_visitante_final','goles_local_ht',
+    'fecha',
+    #'goles_local_final',
+    #'goles_visitante_final',
+    'goles_local_ht',
     'goles_visitante_ht','disparos_local',
     'disparos_visitante','disparos_porteria_local','disparos_porteria_visitante',
     'corners_local','corners_visitante',
