@@ -23,4 +23,20 @@ output_filename = os.path.join(directorio_originales, f"{division}_{cadena}.csv"
 # curl para descargar el archivo
 subprocess.run(["curl", "-o", output_filename, url])
 
-print(f"Actualizado: {output_filename}")
+print(f"Resultados actualizados: {output_filename}")
+
+# Parte 2: calendario
+temporada=fecha.year
+# Si el año es par, la temporada empezó el año anterior
+if fecha.year%2 == 0:
+    temporada = fecha.year - 1
+
+url=f"https://fixturedownload.com/download/epl-{temporada}-GMTStandardTime.csv"
+
+output_filename = os.path.join(directorio_originales, "calendario.csv")
+
+subprocess.run(["curl", "-o", output_filename, url])
+print(f"Calendario actualizado: {output_filename}")
+
+
+

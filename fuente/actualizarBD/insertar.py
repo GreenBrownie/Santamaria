@@ -3,6 +3,7 @@ from sqlalchemy import create_engine, text
 import os
 import numpy as np
 import sys
+from datetime import datetime
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from conexion.conexion import CargadorDatos
 
@@ -18,16 +19,6 @@ directorioEntrada = os.path.join(directorio, 'df.csv')
 #Carga de csv
 df = pd.read_csv(directorioEntrada, encoding='windows-1252', on_bad_lines='skip')
 engine = create_engine('mysql+mysqlconnector://root:5514@localhost/partidosBD')
-
-#Strptime
-#df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%y', errors='coerce').dt.date
-
-#Primer intentoformato con año de 2 dígitos
-df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%y', errors='coerce')
-
-df['Date'] = df['Date'].apply(lambda x: x.isoformat() if x is not None else None)
-#dftest = df['Date']
-#print(dftest)
 
 #Insertar los equipos
 equipos = pd.unique(df[['HomeTeam', 'AwayTeam']].values.ravel())
@@ -59,6 +50,8 @@ df['Time'] = df['Time'].replace({pd.NaT: None, 'NaT': None, np.nan: None})
 #Insertar los datos en la tablisima
 cargador = CargadorDatos()
 
+df['resultado_prediccion'] = None
+
 # Mapear las columnas CSV a nombres de BD
 mapeo_columnas = {
     'Date': 'fecha',
@@ -87,10 +80,7 @@ mapeo_columnas = {
 
 df = df.rename(columns=mapeo_columnas)
 
-
-df['fecha'] = pd.to_datetime(df['fecha'], dayfirst=True, errors='coerce')
-df['id_equipo_local'] = df['id_equipo_local'].astype('Int64')
-df['id_equipo_visitante'] = df['id_equipo_visitante'].astype('Int64')
-cargador.insertar_sin_duplicados(df, 'PartidosML')
+# Insertar sin duplicados
+cargador.insertar_sin_duplicados(df, 'partidosml')
 
         

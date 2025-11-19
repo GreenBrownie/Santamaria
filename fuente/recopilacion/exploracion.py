@@ -5,7 +5,7 @@ import os
 script_dir = os.path.dirname(__file__)
 
 # relativa
-directorio = os.path.join(script_dir, '..', '..', 'datos', 'procesados')
+directorio = os.path.join(script_dir, '..', '..', 'datos', 'originales')
 
 #Directorio de entrada
 directorioEntrada = os.path.join(directorio, 'calendario.csv')

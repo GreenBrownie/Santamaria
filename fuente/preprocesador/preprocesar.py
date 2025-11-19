@@ -18,7 +18,11 @@ class PreprorocesarDatos:
     
     def cargar_datos(self) -> pd.DataFrame:
 
-        df = self.cargador.cargar_todos()
+        cols=', '.join(COLUMNAS_USAR)
+
+        consulta = f"SELECT {cols} FROM partidosml where resultado_final IS NOT NULL"
+
+        df = self.cargador.cargar(consulta=consulta)
         
         columnas_disponibles = [col for col in COLUMNAS_USAR if col in df.columns]
         df = df[columnas_disponibles]
