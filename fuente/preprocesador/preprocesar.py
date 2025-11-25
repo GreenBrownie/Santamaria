@@ -115,7 +115,7 @@ class PreprorocesarDatos:
         directorio = os.path.join(script_dir, '..', '..', 'datos')
         
         #Directorio de salida
-        directorioSalida = os.path.join(directorio, 'procesados', 'partidosPasados.json')
+        directorioSalida = os.path.join(directorio, 'procesados', 'partidosPreprocesados.json')
 
         # Guardar el DataFrame como JSON
         self.df_procesado.to_json(directorioSalida, orient=orient, date_format='iso', indent=2)
