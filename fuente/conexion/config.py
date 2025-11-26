@@ -23,7 +23,7 @@ COLUMNAS_USAR = [
 
 # Columnas numéricas
 COLUMNAS_NUMERICAS = [
-    'fecha',
+    #'fecha',
     #'goles_local_final',
     #'goles_visitante_final',
     'goles_local_ht',

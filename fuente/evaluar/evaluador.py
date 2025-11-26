@@ -213,4 +213,3 @@ class EvaluadorModelo:
     def desconectar(self):
         self.cargador.desconectar()
         print("Conexión cerrada")
-

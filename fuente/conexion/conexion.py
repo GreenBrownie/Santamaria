@@ -2,6 +2,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 from typing import Optional
 from .config import CONFIG_BD, COLUMNAS_USAR
+from sqlalchemy import text
 
 class CargadorDatos:
     def __init__(self, config_bd: dict = None):
@@ -46,20 +47,27 @@ class CargadorDatos:
         return self.cargar(limite=n)
 
     # Validar registro unico de partido, tabla como param para funcionar con la base normalizada
-    def registro_unico(self, tabla: str) -> pd.DataFrame:
-        query = f"SELECT id_equipo_local, id_equipo_visitante, fecha FROM {tabla}"
-        return pd.read_sql(query, con=self.engine)
 
     def insertar_sin_duplicados(self, df: pd.DataFrame, tabla: str):
-        existentes = self.registro_unico(tabla)
+
+        # Cargar registros existentes
+        query = f"""
+            SELECT id_equipo_local, id_equipo_visitante, fecha, resultado_final
+            FROM {tabla}
+        """
+        existentes = pd.read_sql(query, con=self.engine)
+
+        # Si tabla vacía → insertar todo
         if existentes.empty:
             df.to_sql(tabla, con=self.engine, if_exists='append', index=False)
-            print(f"{len(df)} registros insertados en '{tabla}'.")
+            print(f"{len(df)} registros insertados en '{tabla}'. (tabla original vacía)")
             return
 
+        # Normalizar fechas
         df['fecha'] = pd.to_datetime(df['fecha'])
         existentes['fecha'] = pd.to_datetime(existentes['fecha'])
-        # Es más rapido que el and en sql?
+
+        # Crear clave única
         df['clave'] = (
             df['id_equipo_local'].astype(str) + '_' +
             df['id_equipo_visitante'].astype(str) + '_' +
@@ -71,11 +79,40 @@ class CargadorDatos:
             existentes['fecha'].dt.strftime('%Y-%m-%d')
         )
 
+        #Registros nuevos a insertar
         nuevos = df[~df['clave'].isin(existentes['clave'])].copy()
-        nuevos.drop(columns=['clave'], inplace=True)
 
-        if nuevos.empty:
-            print("FLAG Sin registros")
+        if not nuevos.empty:
+            nuevos.drop(columns=['clave'], inplace=True)
+            nuevos.to_sql(tabla, con=self.engine, if_exists='append', index=False)
+            print(f"{len(nuevos)} registros nuevos insertados en '{tabla}'.")
+
+        # Acutaliza registros existentes con NULL en resultado_final
+        # Obtener claves donde el existente tiene resultado_final NULL
+        nulos = existentes[existentes['resultado_final'].isna()]['clave']
+
+        # Filtrar solo los que tenemos en DF y están en NULL en la base
+        actualizables = df[df['clave'].isin(nulos)].copy()
+
+        if actualizables.empty:
             return
 
-        nuevos.to_sql(tabla, con=self.engine, if_exists='append', index=False)
+        # Ejecutar UPDATE por cada registro con NULL
+        with self.engine.begin() as conn:
+            for _, row in actualizables.iterrows():
+                stmt = text(f"""
+                    UPDATE {tabla}
+                    SET resultado_final = :resultado_final
+                    WHERE id_equipo_local = :local
+                    AND id_equipo_visitante = :visitante
+                    AND fecha = :fecha
+                """)
+                conn.execute(stmt, {
+                    'resultado_final': row['resultado_final'],
+                    'local': row['id_equipo_local'],
+                    'visitante': row['id_equipo_visitante'],
+                    'fecha': row['fecha']
+                })
+
+        print(f"{len(actualizables)} registros de partidos ocurridos,atualizados")
+

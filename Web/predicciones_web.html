@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Predicción de resultados de fútbol profesional con redes neuronales</title>
+  <style>
+    :root{--bg:#f7f7fb;--card:#ffffff;--muted:#6b7280;--accent:#0b74da}
+    *{box-sizing:border-box}body{font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:0;background:var(--bg);color:#111}
+    header{background:linear-gradient(90deg,#ffffff, #f1f5f9);padding:18px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e6e9ef}
+    h1{font-size:18px;margin:0}
+    nav{display:flex;gap:8px}
+    .btn{background:transparent;border:1px solid transparent;padding:8px 10px;border-radius:8px;cursor:pointer}
+    .btn.primary{background:var(--accent);color:#fff;border-color:rgba(11,116,218,.2)}
+    .controls{display:flex;gap:8px;align-items:center}
+    .small{font-size:13px;color:var(--muted)}
+    main{padding:18px}
+    .container{max-width:1100px;margin:0 auto}
+    .card{background:var(--card);padding:14px;border-radius:10px;box-shadow:0 1px 2px rgba(16,24,40,.04);margin-bottom:14px}
+
+    /* layout */
+    .topbar{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+    .search{flex:1;display:flex;gap:8px}
+    input[type=text], select{padding:8px;border-radius:8px;border:1px solid #e6e9ef}
+
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #f1f5f9}
+    th{cursor:pointer;user-select:none;background:transparent}
+    th.sort::after{content:' \25B2';font-size:10px;color:var(--muted);opacity:.4}
+    th.sort.desc::after{content:' \25BC'}
+
+    .pagination{display:flex;gap:6px;align-items:center;justify-content:center;padding:10px;flex-wrap:wrap}
+    .page{padding:6px 8px;border-radius:6px;border:1px solid #e6e9ef;background:#fff;cursor:pointer}
+    .page:disabled{opacity:.5;cursor:not-allowed}
+    .page-input{width:50px;padding:6px;border-radius:6px;border:1px solid #e6e9ef}
+
+    .right-actions{display:flex;gap:8px;align-items:center}
+    .icon{width:36px;height:36px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;background:#fff;border:1px solid #e6e9ef}
+
+    /* modals */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,.5);display:none;align-items:center;justify-content:center;padding:20px}
+    .modal{background:#fff;border-radius:10px;max-width:640px;width:100%;padding:18px;max-height:80vh;overflow-y:auto}
+    .modal h3{margin-top:0}
+    .close{float:right;cursor:pointer}
+
+    /* responsive */
+    @media (max-width:800px){th,td{font-size:12px}header{padding:12px}h1{font-size:14px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display:flex;align-items:center;gap:12px">
+      <h1>Predicción de resultados de fútbol profesional con redes neuronales</h1>
+      <nav>
+        <button class="btn" id="link-pred">Predicciones</button>
+        <button class="btn" id="link-hist">Histórico</button>
+      </nav>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="terminos">Terminos</button>
+      <button class="btn" id="help-btn">Ayuda</button>
+      <button class="btn" id="about-btn">Info</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+
+      <!-- PREDICCIONES -->
+      <section id="predicciones-section" class="card" style="display:none">
+        <div class="topbar">
+          <div class="search">
+            <input type="text" id="search-pred" placeholder="Buscar predicción" />
+          </div>
+          <div class="right-actions">
+            <div class="small">Mostrar</div>
+            <select id="page-size-pred"><option>10</option><option>25</option><option>50</option></select>
+          </div>
+        </div>
+
+        <div id="table-pred-container"></div>
+        <div id="pagination-pred" class="pagination"></div>
+      </section>
+
+      <!-- HISTORICO -->
+      <section id="hist-section" class="card" style="display:none">
+        <div class="topbar">
+          <div class="search">
+            <input type="text" id="search-hist" placeholder="Buscar partido / equipo ..." />
+          </div>
+          <div class="right-actions">
+            <div class="small">Mostrar</div>
+            <select id="page-size-hist"><option>10</option><option>25</option><option>50</option></select>
+          </div>
+        </div>
+
+        <div id="table-hist-container"></div>
+        <div id="pagination-hist" class="pagination"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Modals -->
+  <div id="modal-backdrop" class="modal-backdrop"><div class="modal" role="dialog">
+    <button class="close" id="modal-close">✕</button>
+    <div id="modal-content"></div>
+  </div></div>
+
+  <script>
+    const PARTIDOS_JSON = 'partidosBD.json';
+    const PREDICCIONES_JSON = 'predicciones.json';
+    let partidos = [];
+    let predicciones = [];
+
+    function $(sel){return document.querySelector(sel)}
+
+    function createEl(tag, attrs={}, children=[]){const e=document.createElement(tag);Object.entries(attrs).forEach(([k,v])=>{if(k==='text'){e.textContent=v}else e.setAttribute(k,v)});children.forEach(c=>e.appendChild(c));return e}
+    async function loadData(){
+      try{
+        const [pResp, predResp] = await Promise.all([
+          fetch(PARTIDOS_JSON),
+          fetch(PREDICCIONES_JSON)
+        ]);
+        partidos = await pResp.json();
+        predicciones = await predResp.json();
+      }catch(e){console.error('Error cargando JSON', e); alert('No se pudieron cargar los pronósticos')}
+    }
+
+    function renderTable({containerId, columns, rows, page=1, pageSize=10, onSort}){
+      const container = $(containerId);
+      container.innerHTML='';
+
+      const table = createEl('table');
+      const thead = createEl('thead');
+      const headerRow = createEl('tr');
+      columns.forEach(col=>{
+        const th = createEl('th', {text: col.label});
+        if(col.sortable){
+          th.classList.add('sort');
+          th.addEventListener('click', ()=>{onSort && onSort(col.key)});
+        }
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = createEl('tbody');
+
+      const start = (page-1)*pageSize;
+      const pageRows = rows.slice(start, start+pageSize);
+
+      pageRows.forEach(r=>{
+        const tr = createEl('tr');
+        columns.forEach(col=>{
+          const td = createEl('td');
+          let val = r[col.key];
+          if(col.render) val = col.render(r[col.key], r);
+          td.textContent = (val === null || val === undefined) ? '' : String(val);
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(tbody);
+      container.appendChild(table);
+      return {rowsCount: rows.length};
+    }
+
+
+    function makeTableState(rows){
+      return {rows: Array.isArray(rows)?rows.slice():[], sortKey:null, sortDir:1, page:1, pageSize:10, filterText:'', extraFilter:null};
+    }
+
+    const statePred = makeTableState([]);
+    const stateHist = makeTableState([]);
+
+    function applyFilters(state){
+      let out = state.rows.slice();
+      const q = state.filterText && state.filterText.toLowerCase();
+      if(q){
+        out = out.filter(r=>JSON.stringify(r).toLowerCase().includes(q));
+      }
+      if(state.extraFilter){
+        out = out.filter(state.extraFilter);
+      }
+      if(state.sortKey){
+        out.sort((a,b)=>{
+          const A = a[state.sortKey], B = b[state.sortKey];
+          if(A==null) return 1; if(B==null) return -1;
+          if(typeof A === 'number' && typeof B === 'number') return (A-B)*state.sortDir;
+          return String(A).localeCompare(String(B))*state.sortDir;
+        });
+      }
+      return out;
+    }
+
+    function setupPredicciones(){
+      statePred.rows = predicciones.map(p=>({
+        equipo_local: p.nombre_equipo_local || p.equipo_local || '',
+        equipo_visitante: p.nombre_equipo_visitante || p.equipo_visitante || '',
+        fecha: p.fecha,
+        prediccion: p.prediccion_letra || p.prediccion,
+        porcentaje_home: p.porcentaje_home,
+        porcentaje_draw: p.porcentaje_draw,
+        porcentaje_away: p.porcentaje_away,
+        timestamp: p.timestamp_prediccion
+      }));
+
+      const cols = [
+        {key:'fecha', label:'Fecha', sortable:true},
+        {key:'equipo_local', label:'Local', sortable:true},
+        {key:'equipo_visitante', label:'Visitante', sortable:true},
+        {key:'prediccion', label:'Predicción', sortable:true},
+        {key:'porcentaje_home', label:'% Home', sortable:true},
+        {key:'porcentaje_draw', label:'% Draw', sortable:true},
+        {key:'porcentaje_away', label:'% Away', sortable:true}
+      ];
+
+      function draw(){
+        const rows = applyFilters(statePred);
+        const pageSize = parseInt($('#page-size-pred').value,10)||10;
+        const page = statePred.page || 1;
+        renderTable({containerId:'#table-pred-container', columns:cols, rows, page, pageSize, onSort:(key)=>{
+          if(statePred.sortKey===key) statePred.sortDir *= -1; else {statePred.sortKey=key; statePred.sortDir=1}
+          draw();
+        }});
+        renderPagination('#pagination-pred', rows.length, page, pageSize, (p)=>{statePred.page=p; draw()});
+      }
+
+      $('#search-pred').addEventListener('input', e=>{statePred.filterText=e.target.value; statePred.page=1; draw()});
+
+      $('#page-size-pred').addEventListener('change', e=>{statePred.pageSize=parseInt(e.target.value,10); statePred.page=1; draw()});
+
+      $('#page-size-pred').value='10';
+      draw();
+    }
+
+
+    function setupHistorico(){
+      stateHist.rows = partidos.map(p=>({
+        id_partido: p.id_partido,
+        fecha: p.fecha,
+        hora: p.hora,
+        equipo_local: p.equipo_local,
+        equipo_visitante: p.equipo_visitante,
+        goles_local_final: p.goles_local_final,
+        goles_visitante_final: p.goles_visitante_final,
+        resultado_final: p.resultado_final,
+      }));
+
+      const dates = Array.from(new Set(stateHist.rows.map(r=>r.fecha))).sort();
+
+      const cols = [
+        {key:'fecha', label:'Fecha', sortable:true},
+        {key:'hora', label:'Hora', sortable:true},
+        {key:'equipo_local', label:'Local', sortable:true},
+        {key:'equipo_visitante', label:'Visitante', sortable:true},
+        {key:'goles_local_final', label:'Goles L', sortable:true},
+        {key:'goles_visitante_final', label:'Goles V', sortable:true},
+        {key:'resultado_final', label:'Resultado', sortable:true},
+      ];
+
+      function draw(){
+        const rows = applyFilters(stateHist);
+        const pageSize = parseInt($('#page-size-hist').value,10)||10;
+        const page = stateHist.page || 1;
+        renderTable({containerId:'#table-hist-container', columns:cols, rows, page, pageSize, onSort:(key)=>{
+          if(stateHist.sortKey===key) stateHist.sortDir *= -1; else {stateHist.sortKey=key; stateHist.sortDir=1}
+          draw();
+        }});
+        renderCompactPagination('#pagination-hist', rows.length, page, pageSize, (p)=>{stateHist.page=p; draw()});
+      }
+
+      $('#search-hist').addEventListener('input', e=>{stateHist.filterText=e.target.value; stateHist.page=1; draw()});
+      $('#page-size-hist').addEventListener('change', e=>{stateHist.pageSize=parseInt(e.target.value,10); stateHist.page=1; draw()});
+      $('#page-size-hist').value='10';
+
+      draw();
+    }
+
+    function renderPagination(containerSel, total, currentPage, pageSize, onPage){
+      const node = $(containerSel); node.innerHTML='';
+      const pages = Math.max(1, Math.ceil(total/pageSize));
+      for(let p=1;p<=pages;p++){
+        const b = createEl('button',{class:'page'}); b.textContent = p; if(p===currentPage) b.style.fontWeight='600'; b.addEventListener('click', ()=>onPage(p)); node.appendChild(b);
+      }
+    }
+
+    function renderCompactPagination(containerSel, total, currentPage, pageSize, onPage){
+      const node = $(containerSel); node.innerHTML='';
+      const pages = Math.max(1, Math.ceil(total/pageSize));
+      
+      const btnFirst = createEl('button',{class:'page',text:'«'}); btnFirst.disabled = currentPage===1; btnFirst.addEventListener('click', ()=>onPage(1)); node.appendChild(btnFirst);
+      const btnPrev = createEl('button',{class:'page',text:'‹'}); btnPrev.disabled = currentPage===1; btnPrev.addEventListener('click', ()=>onPage(currentPage-1)); node.appendChild(btnPrev);
+      
+      const input = createEl('input',{class:'page-input',type:'number',value:currentPage,min:1,max:pages}); input.addEventListener('change', ()=>{const p=Math.max(1,Math.min(pages,parseInt(input.value,10)||1)); onPage(p); input.value=p}); node.appendChild(input);
+      
+      const span = createEl('span',{text:`/ ${pages}`}); node.appendChild(span);
+    
+      const btnNext = createEl('button',{class:'page',text:'›'}); btnNext.disabled = currentPage===pages; btnNext.addEventListener('click', ()=>onPage(currentPage+1)); node.appendChild(btnNext);
+      const btnLast = createEl('button',{class:'page',text:'»'}); btnLast.disabled = currentPage===pages; btnLast.addEventListener('click', ()=>onPage(pages)); node.appendChild(btnLast);
+    }
+
+    function showSection(sec){
+      $('#predicciones-section').style.display = sec==='pred'? 'block':'none';
+      $('#hist-section').style.display = sec==='hist'? 'block':'none';
+    }
+
+    $('#link-pred').addEventListener('click', ()=>{showSection('pred');});
+    $('#link-hist').addEventListener('click', ()=>{showSection('hist');});
+
+    function openModal(html){$('#modal-content').innerHTML = html; $('#modal-backdrop').style.display='flex'}
+    function closeModal(){ $('#modal-backdrop').style.display='none'; }
+    $('#modal-close').addEventListener('click', closeModal);
+
+    $('#help-btn').addEventListener('click', ()=>{
+      openModal(`<h3>Ayuda rápida</h3><p>Usa los buscadores y filtros para acotar los registros. Haz clic en las cabeceras para ordenar. Usa los botones de paginación para navegar.</p>`);
+    });
+  $('#about-btn').addEventListener('click', ()=>{
+    openModal(`
+      <h3>Acerca del proyecto</h3>
+      <p>
+        Este proyecto utiliza una red neuronal para generar predicciones de partidos, 
+        complementadas con el histórico completo de encuentros.
+      </p>
+      <p>
+        Durante el desarrollo se identificó un hallazgo importante: usar los IDs numéricos 
+        de los equipos como entrada no permite que el modelo distinga realmente entre clubes. 
+        Estos IDs no contienen información deportiva, por lo que la red no puede aprender 
+        patrones significativos a partir de ellos.
+      </p>
+      <p>
+        Esto explica los sesgos observados en ciertas predicciones, ya que el modelo carece 
+        de datos que representen el rendimiento real de cada equipo.
+      </p>
+      <p>
+        El siguiente paso será reemplazar los IDs por características más descriptivas, 
+        como promedios históricos y métricas agregadas. Esto permitirá que la red neuronal 
+        tome decisiones basadas en comportamiento futbolístico real, no en números arbitrarios.
+      </p>
+      <p>
+        Este descubrimiento marca una etapa clave hacia una versión más precisa e inteligente 
+        del modelo.
+      </p>
+    `);
+  });
+
+    
+$('#about-btn').addEventListener('click', ()=>{
+    openModal(`
+      <h3>Acerca del proyecto</h3>
+      <p>
+        Este proyecto utiliza una red neuronal para generar predicciones de partidos, 
+        complementadas con el histórico completo de encuentros.
+      </p>
+      <p>
+        Durante el desarrollo se identificó un hallazgo importante: usar los IDs numéricos 
+        de los equipos como entrada no permite que el modelo distinga realmente entre clubes. 
+        Estos IDs no contienen información deportiva, por lo que la red no puede aprender 
+        patrones significativos a partir de ellos.
+      </p>
+      <p>
+        Esto explica los sesgos observados en ciertas predicciones, ya que el modelo carece 
+        de datos que representen el rendimiento real de cada equipo.
+      </p>
+      <p>
+        El siguiente paso será reemplazar los IDs por características más descriptivas, 
+        como promedios históricos y métricas agregadas. Esto permitirá que la red neuronal 
+        tome decisiones basadas en comportamiento futbolístico real, no en números arbitrarios.
+      </p>
+      <p>
+        Este descubrimiento marca una etapa clave hacia una versión más precisa e inteligente 
+        del modelo.
+      </p>
+    `);
+  });
+
+  $('#terminos').addEventListener('click', ()=>{
+    openModal(`
+      <h3>Ayuda rápida</h3>
+      <h4>Significado de H, A y D</h4>
+      <p>
+        Estos símbolos representan el resultado esperado de un partido:
+        <br><strong>H</strong> – Gana el equipo local (Home).  
+        <br><strong>A</strong> – Gana el equipo visitante (Away).  
+        <br><strong>D</strong> – Empate (Draw).
+      </p>
+    `);
+  });
+
+
+    (async function init(){
+      await loadData();
+      setupPredicciones();
+      setupHistorico();
+      showSection('pred');
+    })();
+  </script>
+</body>
+</html>

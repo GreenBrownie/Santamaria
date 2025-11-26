@@ -2,6 +2,7 @@ import subprocess
 import sys
 import os
 from datetime import datetime
+import shutil
 
 script_dir = os.path.dirname(__file__)
 
@@ -47,6 +48,15 @@ def main():
         else:
             fallidos += 1
     print(f"\nEjecutados exitosamente: {exitosos}, Fallidos: {fallidos}")
+    # Finalmente, copiar los archivos generados a la carpeta web
+    script_dir = os.path.dirname(__file__)
+
+    ruta_origen = os.path.join(script_dir, '..', '..', 'datos', 'procesados')
+    ruta_destino = os.path.join(script_dir, '..', '..', 'web')
+
+    shutil.copy(os.path.join(ruta_origen, 'predicciones.json'), os.path.join(ruta_destino, 'predicciones.json'))
+    shutil.copy(os.path.join(ruta_origen, 'partidosBD.json'), os.path.join(ruta_destino, 'partidosBD.json'))
+
     sys.exit(0 if fallidos == 0 else 1)
 
 if __name__ == "__main__":
